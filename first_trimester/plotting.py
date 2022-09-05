@@ -69,9 +69,6 @@ def plot_target_classes(y_train: np.ndarray, y_val: np.ndarray, y_test: np.ndarr
 
     ax2.bar(target_classes, test_occurrences, color=color, width=width)
     ax2.set_title("Test Absolute\nOccurrences")
-    ax2.text(
-        1, test_occurrences[1], test_occurrences[1], ha="center", va="bottom", size=15
-    )
 
     ax3.bar(
         target_classes, train_occurrences / total_occurrences, color=color, width=width

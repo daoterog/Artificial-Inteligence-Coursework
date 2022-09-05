@@ -7,8 +7,10 @@ import typing as t
 from collections import OrderedDict
 from csv import reader
 
+import pandas as pd
 import numpy as np
 import scipy.io as sio
+import plotly.express as px
 import matplotlib.pyplot as plt
 
 from sklearn.utils import shuffle
@@ -116,10 +118,18 @@ def stack_mean_gradients(
     return np.stack(list(mean_grads.values())).T
 
 
-def plot_training_history(train_history: OrderedDict) -> None:
+def plot_training_history(
+    train_history: OrderedDict,
+    plot_by_epoch: bool = False,
+    train_len: int = None,
+    savefig: bool = False,
+    figname: str = "model_history",
+) -> None:
     """Plots the training history.
     Args:
         train_history (OrderedDict): Training history.
+        savefig (bool, optional): Whether to save the figure. Defaults to False.
+        figname (str, optional): Figure name. Defaults to 'model_history'.
     """
 
     # Unzip items
@@ -137,30 +147,57 @@ def plot_training_history(train_history: OrderedDict) -> None:
     _, weight_layer_mean_grads = unstack_grads(weight_grads)
     _, bias_layer_mean_grads = unstack_grads(bias_grads)
 
+    include_bias = any(bias_grads)
+
     # Stack mean gradients
     weight_stacked_mean_grads = stack_mean_gradients(weight_layer_mean_grads)
-    bias_stacked_mean_grads = stack_mean_gradients(bias_layer_mean_grads)
+    if include_bias:
+        bias_stacked_mean_grads = stack_mean_gradients(bias_layer_mean_grads)
 
-    _, (ax0, ax1, ax2) = plt.subplots(1, 3, figsize=(15, 3))
+    xlabel = 'Iteration'
+    if plot_by_epoch:
+        mean_loss = np.array(mean_loss).reshape(-1, 1)
+        print(mean_loss.shape)
+        weight_stacked_mean_grads, mean_loss = zip(*[
+            (np.mean(grad_batch, axis=1), np.mean(loss_batch, axis=1))
+            for grad_batch, loss_batch in get_batch(weight_stacked_mean_grads.T, mean_loss.T, train_len)
+        ])
+        iters = list(range(len(mean_loss)))
+        xlabel = 'Epoch'
+        if include_bias:
+            bias_stacked_mean_grads = [
+                np.mean(grad_batch)
+                for grad_batch, _ in get_batch(bias_stacked_mean_grads.T, bias_stacked_mean_grads.T, train_len)
+            ]
+
+    if include_bias:
+        _, (ax0, ax1, ax2) = plt.subplots(1, 3, figsize=(15, 3))
+    else:
+        _, (ax0, ax1) = plt.subplots(1, 2, figsize=(10, 3))
 
     ax0.plot(iters, mean_loss)
     ax0.set_title("Loss")
-    ax0.set_xlabel("Iteration")
+    ax0.set_xlabel(xlabel)
     ax0.set_ylabel("Loss")
 
     ax1.plot(iters, weight_stacked_mean_grads)
     ax1.set_title("Mean weight gradients")
+    ax1.legend([f"Layer {i}" for i in range(len(weight_stacked_mean_grads[0]))])
+    ax1.set_xlabel(xlabel)
+    ax1.set_ylabel("Mean gradient")
 
-    ax2.plot(iters, bias_stacked_mean_grads)
-    ax2.set_title("Mean bias gradients")
-
-    for ax in (ax1, ax2):
-        ax.legend([f"Layer {i}" for i in range(len(bias_stacked_mean_grads[0]))])
-        ax.set_xlabel("Iteration")
-        ax.set_ylabel("Mean gradient")
+    if include_bias:
+        ax2.plot(iters, bias_stacked_mean_grads)
+        ax2.set_title("Mean bias gradients")
+        ax2.legend([f"Layer {i}" for i in range(len(bias_stacked_mean_grads[0]))])
+        ax2.set_xlabel(xlabel)
+        ax2.set_ylabel("Mean gradient")
 
     plt.tight_layout()
+    if savefig:
+        plt.savefig(f"{figname}.png")
     plt.show()
+
 
 def readmatfile(filepath: str) -> np.ndarray:
     """Reads a .mat file.
@@ -172,7 +209,7 @@ def readmatfile(filepath: str) -> np.ndarray:
     # Read matlab file
     mat = sio.loadmat(filepath)
     # Define column names
-    columns = list(mat.keys() - ['__header__', '__version__', '__globals__'])
+    columns = list(mat.keys() - ["__header__", "__version__", "__globals__"])
     # Iterate over columns length and extract the most repeated length
     all_n_rows = []
     for column in columns:
@@ -196,7 +233,7 @@ def readfile(filename: str) -> np.ndarray:
         np.ndarray: data.
     """
     filepath = os.path.join(os.getcwd(), "data", filename)
-    if filename[-3:] == 'mat':
+    if filename[-3:] == "mat":
         return readmatfile(filepath)
 
     with open(filepath, "r", encoding="UTF-8") as file:
@@ -297,3 +334,35 @@ def sample_data(
     test_array = shuffled_array
 
     return train_array, test_array
+
+
+def standardize_data(data: np.ndarray) -> np.ndarray:
+    """Standardizes the data.
+    Args:
+        data (np.ndarray): Data to normalize.
+    Returns:
+        np.ndarray: Standardized data.
+    """
+    data_min = np.min(data, axis=0)
+    data_max = np.max(data, axis=0)
+    data_std = (data - data_min) / (data_max - data_min)
+    return data_std * 2 - 1
+
+
+def plot3d_data(data: np.ndarray, indices: list) -> None:
+    """Plots 3D data by selecting the variables contained in the indices list.
+    Args:
+        data (np.ndarray): Data to plot.
+        indices (list): List of indices of the variables to plot.
+    """
+    feature_df = pd.DataFrame(data)
+    fig = px.scatter_3d(
+        feature_df,
+        x=indices[0],
+        y=indices[1],
+        z=indices[2],
+        size_max=18,
+        opacity=0.7,
+    )
+    fig.update_traces(showlegend=False)
+    fig.show()

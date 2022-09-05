@@ -10,9 +10,9 @@ from neural_network import NeuralNetwork
 from utils import train_model, plot_training_history
 
 LEARNING_RATE = 0.01
-MODEL_LOSS = "binary_cross_entropy"
-N_ITER = 100000
-BATCH_SIZE = 4
+MODEL_LOSS = "cuadratic"
+N_ITER = 2
+BATCH_SIZE = 1
 
 if __name__ == "__main__":
 
@@ -23,8 +23,8 @@ if __name__ == "__main__":
     # Create model
     model = NeuralNetwork(
         [
-            Layer(feature_matrix.shape[1], 2, "sigmoid"),
-            Layer(2, 2, "sigmoid"),
+            Layer(feature_matrix.shape[1], 2, "relu"),
+            Layer(2, 2, "relu"),
             Layer(2, targets.shape[1], "sigmoid"),
         ],
         LEARNING_RATE,

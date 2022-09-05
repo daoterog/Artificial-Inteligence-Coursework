@@ -52,6 +52,15 @@ class NeuralNetwork:
         for layer in reversed(self.layers):
             previous_local_gradient = layer.backward(previous_local_gradient)
 
+    def predict(self, inputs: np.ndarray) -> np.ndarray:
+        """Predicts the output of the neural network.
+        Args:
+            inputs (np.ndarray): Input data.
+        Returns:
+            np.ndarray: Output data.
+        """
+        return self.forward(inputs.T)
+
     def step(self) -> None:
         """Makes a step of the neural network."""
         for layer in self.layers:
@@ -76,5 +85,6 @@ class NeuralNetwork:
         for lay_num, layer in enumerate(self.layers):
             weight_grad, bias_grad = layer.get_grads()
             weight_grads[lay_num] =  weight_grad
-            bias_grads[lay_num] = bias_grad
+            if layer.include_bias:
+                bias_grads[lay_num] = bias_grad
         return weight_grads, bias_grads

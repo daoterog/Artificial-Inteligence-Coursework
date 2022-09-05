@@ -25,10 +25,12 @@ class Layer:
     """Layers object of neural network."""
 
     def __init__(
-        self, input_size: np.ndarray, output_size: np.ndarray, activation: str
+        self, input_size: np.ndarray, output_size: np.ndarray, activation: str, include_bias: bool = False
     ):
         self.weights = np.random.randn(output_size, input_size) * 0.01
-        self.bias = np.zeros((output_size, 1))
+        self.include_bias = include_bias
+        if self.include_bias:
+            self.bias = np.zeros((output_size, 1))
 
         self.inputs = None
         self.local_field = None
@@ -64,7 +66,9 @@ class Layer:
             np.ndarray: Outputs of the layer.
         """
         self.inputs = inputs
-        self.local_field = np.matmul(self.weights, inputs) + self.bias
+        self.local_field = np.matmul(self.weights, inputs)
+        if self.include_bias:
+            self.local_field = self.local_field + self.bias
         self.outputs = self.activation(self.local_field)
         return self.outputs
 
@@ -80,7 +84,8 @@ class Layer:
             previous_local_gradient, self.activation_derivative(self.local_field)
         )
         self.weights_grad = np.matmul(self.local_gradient, self.inputs.T)
-        self.bias_grad = np.mean(self.local_gradient, axis=1, keepdims=True)
+        if self.include_bias:
+            self.bias_grad = np.mean(self.local_gradient, axis=1, keepdims=True)
         return np.matmul(self.weights.T, self.local_gradient)
 
     def step(self, learning_rate: float) -> None:
@@ -89,7 +94,8 @@ class Layer:
             learning_rate (float): Learning rate of the neural network.
         """
         self.weights = self.weights - learning_rate * self.weights_grad
-        self.bias = self.bias - learning_rate * self.bias_grad
+        if self.include_bias:
+            self.bias = self.bias - learning_rate * self.bias_grad
 
     def get_grads(self) -> t.Tuple[np.ndarray, np.ndarray]:
         """Returns the gradients of the layer.

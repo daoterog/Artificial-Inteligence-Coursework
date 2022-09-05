@@ -8,6 +8,7 @@ from collections import OrderedDict
 from csv import reader
 
 import numpy as np
+import scipy.io as sio
 import matplotlib.pyplot as plt
 
 from sklearn.utils import shuffle
@@ -161,6 +162,31 @@ def plot_training_history(train_history: OrderedDict) -> None:
     plt.tight_layout()
     plt.show()
 
+def readmatfile(filepath: str) -> np.ndarray:
+    """Reads a .mat file.
+    Args:
+        filepath (str): filepath.
+    Returns:
+        np.ndarray: Data.
+    """
+    # Read matlab file
+    mat = sio.loadmat(filepath)
+    # Define column names
+    columns = list(mat.keys() - ['__header__', '__version__', '__globals__'])
+    # Iterate over columns length and extract the most repeated length
+    all_n_rows = []
+    for column in columns:
+        n_rows = mat[column].shape[0]
+        if n_rows != 1:
+            all_n_rows.append(n_rows)
+    row_len = np.unique(all_n_rows, return_counts=True)[0][0]
+    # Store columns that have the most repeated length in a list and stack them into a ndarray
+    col_list = []
+    for column in columns:
+        if mat[column].shape[0] == row_len:
+            col_list.append(mat[column])
+    return np.hstack(col_list)
+
 
 def readfile(filename: str) -> np.ndarray:
     """Reads a csv file and returns a numpy array.
@@ -170,6 +196,9 @@ def readfile(filename: str) -> np.ndarray:
         np.ndarray: data.
     """
     filepath = os.path.join(os.getcwd(), "data", filename)
+    if filename[-3:] == 'mat':
+        return readmatfile(filepath)
+
     with open(filepath, "r", encoding="UTF-8") as file:
         csv_reader = reader(file)
         data = np.vstack(list(csv_reader)).astype(np.float)

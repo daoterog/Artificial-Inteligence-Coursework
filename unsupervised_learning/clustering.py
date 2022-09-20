@@ -447,8 +447,8 @@ class MountainClustering(BaseEstimator, ClusterMixin):
         ]
         # Get first cluster by finding the maximum of the mountain function
         self._update_centers(mountain_functions, prototypes)
-        # Repeat number_of_clusters - 1 times
-        for _ in range(self.number_of_clusters - 1):
+        # Repeat number_of_clusters
+        for _ in range(self.number_of_clusters):
             # Update mountain function
             mountain_functions = [
                 self._update_mountains(prototype, mountain_function)
@@ -576,8 +576,8 @@ class SubstractiveClustering(BaseEstimator, ClusterMixin):
         ]
         # Get first center with highest density
         self._update_centers(feature_matrix, densities)
-        # Repeat for number_of_clusters - 1 times
-        for _ in range(self.number_of_clusters - 1):
+        # Repeat for number_of_clusters times
+        for _ in range(self.number_of_clusters):
             # Update densities
             densities = [
                 self._update_densities(datapoint, density)

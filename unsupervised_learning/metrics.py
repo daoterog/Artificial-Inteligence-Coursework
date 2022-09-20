@@ -60,9 +60,7 @@ def mahalanobis_distance(
     second_datapoint = second_datapoint.reshape(-1, 1)
     return np.sqrt(
         np.dot(
-            np.dot(
-                (first_datapoint - second_datapoint).T, inverse_covariance_matrix
-            ),
+            np.dot((first_datapoint - second_datapoint).T, inverse_covariance_matrix),
             (first_datapoint - second_datapoint),
         )
     )
@@ -80,7 +78,9 @@ def build_mahalanobis_distance_matrix(feature_matrix: np.ndarray) -> np.ndarray:
 
     distance_matrix = [
         [
-            mahalanobis_distance(first_datapoint, second_datapoint, inverse_covariance_matrix)
+            mahalanobis_distance(
+                first_datapoint, second_datapoint, inverse_covariance_matrix
+            )
             for second_datapoint in feature_matrix
         ]
         for first_datapoint in feature_matrix

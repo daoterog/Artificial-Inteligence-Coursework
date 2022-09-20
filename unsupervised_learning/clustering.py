@@ -11,6 +11,8 @@ from metrics import (
     mahalanobis_distance,
 )
 
+from sklearn.base import BaseEstimator, ClusterMixin
+
 
 class DistanceMetric:
 
@@ -64,39 +66,44 @@ class DistanceMetric:
             return self.distance_criterion(feature_matrix, datapoint)
 
 
-class KMeans:
+class KMeans(BaseEstimator, ClusterMixin):
 
     """K-Means algorithm"""
 
     def __init__(
         self,
-        number_of_clusters: int,
-        distance_metric: str,
-        max_iters: int,
-        verbose: bool,
+        number_of_clusters: int = 5,
+        distance_metric: str = "euclidean",
+        n_iter: int = 1000,
+        verbose: bool = False,
     ) -> None:
         """Initializes the KMeans class.
         Args:
-            number_of_clusters (int): Number of clusters.
-            distance_metric (str): Distance metric.
+            number_of_clusters (int): Number of clusters. Defaults to 5.
+            distance_metric (str): Distance metric. Defaults to 'euclidean'.
+            max_iters (int): Maximum number of iterations. Defaults to 1000.
+            verbose (bool): Verbose. Defaults to False.
         """
         self.number_of_clusters = number_of_clusters
-        self.max_iters = max_iters
+        self.max_iters = n_iter
         self.verbose = verbose
         self.distance_criterion = DistanceMetric(distance_metric).get_distance
 
-        self.assignments = None
-        self.centers = None
+        self.n_features_in_ = None
+        self.assignments_ = None
+        self.centers_ = None
 
     def _initialize_variables(self, feature_matrix: np.ndarray) -> None:
         """Initializes the variables.
         Args:
             feature_matrix (np.ndarray): Feature matrix.
         """
+        # Indicate numbers of features to expect for predict calls
+        self.n_features_in_ = feature_matrix.shape[1]
         # Initialize assignments matrix
-        self.assignments = np.zeros(feature_matrix.shape[0])
+        self.assignments_ = np.zeros(feature_matrix.shape[0])
         # Initialize k cluster centers with random points
-        self.centers = np.random.permutation(feature_matrix)[: self.number_of_clusters]
+        self.centers_ = np.random.permutation(feature_matrix)[: self.number_of_clusters]
 
     def _assign_datapoints(self, feature_matrix: np.ndarray) -> None:
         """Assigns datapoints to clusters.
@@ -105,9 +112,9 @@ class KMeans:
         """
         for idx, datapoint in enumerate(feature_matrix):
             # Get distance to clusters
-            distance_to_centers = self.distance_criterion(self.centers, datapoint)
+            distance_to_centers = self.distance_criterion(self.centers_, datapoint)
             # Assign data point to closest cluster
-            self.assignments[idx] = np.argmin(distance_to_centers)
+            self.assignments_[idx] = np.argmin(distance_to_centers)
 
     def _update_cluster_centers(self, feature_matrix: np.ndarray) -> None:
         """Updates the cluster centers.
@@ -115,7 +122,7 @@ class KMeans:
             feature_matrix (np.ndarray): Feature matrix.
         """
         for cluster in range(self.number_of_clusters):
-            self.centers[cluster] = np.mean(feature_matrix[self.assignments == cluster])
+            self.centers_[cluster] = np.mean(feature_matrix[self.assignments_ == cluster])
 
     def _compute_cost(self, feature_matrix: np.ndarray) -> None:
         """Computes the cost function.
@@ -128,16 +135,18 @@ class KMeans:
         for cluster in range(self.number_of_clusters):
             cost += np.sum(
                 self.distance_criterion(
-                    feature_matrix[self.assignments == cluster], self.centers[cluster]
+                    feature_matrix[self.assignments_ == cluster], self.centers_[cluster]
                 )
             )
         if self.verbose:
             print(f"Cost: {cost}")
 
-    def fit(self, feature_matrix: np.ndarray) -> None:
+    def fit(self, feature_matrix: np.ndarray, target: np.ndarray = None) -> None:
         """Fits the KMeans algorithm.
         Args:
             feature_matrix (np.ndarray): Feature matrix.
+            target (np.ndarray): Target. Defaults to None. This parameter is not used and is only
+                added for it to be compliant with the sklearn API.
         """
         # Initialize variables
         self._initialize_variables(feature_matrix)
@@ -149,53 +158,60 @@ class KMeans:
             self._update_cluster_centers(feature_matrix)
             # Compute cost function
             self._compute_cost(feature_matrix)
+        return self
 
-    def transform(self) -> np.ndarray:
+    def predict(self) -> np.ndarray:
         """Returns the assignments matrix.
         Returns:
             np.ndarray: Assignments matrix.
         """
-        return self.assignments
+        return self.assignments_
 
 
-class FuzzCMeans:
+class FuzzCMeans(BaseEstimator, ClusterMixin):
 
     """Fuzzy C-Means algorithm."""
 
     def __init__(
         self,
-        number_of_clusters: int,
-        fuzzines_parameter: int,
-        distance_metric: str,
-        max_iters: int,
-        verbose: bool,
+        number_of_clusters: int = 5,
+        fuzzines_parameter: int = 2,
+        distance_metric: str = "euclidean",
+        n_iter: int = 1000,
+        verbose: bool = False,
     ) -> None:
         """Initializes the FuzzCMeans class.
         Args:
-            number_of_clusters (int): Number of clusters.
-            max_iters (int): Maximum number of iterations.
+            number_of_clusters (int): Number of clusters. Defaults to 5.
+            fuzzines_parameter (int): Fuzzines parameter. Defaults to 2.
+            distance_metric (str): Distance metric. Defaults to 'euclidean'.
+            max_iters (int): Maximum number of iterations. Defaults to 1000.
+            verbose (bool): Verbose. Defaults to False.
         """
         self.number_of_clusters = number_of_clusters
-        self.max_iters = max_iters
+        self.max_iters = n_iter
         self.verbose = verbose
         self.distance_criterion = DistanceMetric(distance_metric).get_distance
         self.fuzzines_parameter = fuzzines_parameter
 
-        self.assignments = None
-        self.centers = None
+        self.n_features_in_ = None
+        self.assignments_ = None
+        self.centers_ = None
 
     def _initialize_variables(self, feature_matrix: np.ndarray) -> None:
         """Initializes the variables.
         Args:
             feature_matrix (np.ndarray): Feature matrix.
         """
+        # Indicate numbers of features to expect for predict calls
+        self.n_features_in_ = feature_matrix.shape[1]
         # Initialize membership matrix and normalize it
-        self.assignments = np.random.rand(
+        self.assignments_ = np.random.rand(
             feature_matrix.shape[0], self.number_of_clusters
         )
-        self.assignments = self.assignments / np.sum(self.assignments, axis=1)[:, None]
+        self.assignments_ = self.assignments_ / np.sum(self.assignments_, axis=1)[:, None]
         # Initialize cluster centers
-        self.centers = np.zeros((self.number_of_clusters, feature_matrix.shape[1]))
+        self.centers_ = np.zeros((self.number_of_clusters, feature_matrix.shape[1]))
 
     def _update_cluster_centers(self, feature_matrix: np.ndarray) -> None:
         """Updates the cluster centers.
@@ -203,10 +219,10 @@ class FuzzCMeans:
             feature_matrix (np.ndarray): Feature matrix.
         """
         # Elevate membership matrix to fuzzines parameter
-        membership_coefficients = np.power(self.assignments, self.fuzzines_parameter)
+        membership_coefficients = np.power(self.assignments_, self.fuzzines_parameter)
         # Update cluster centers
         for i in range(self.number_of_clusters):
-            self.centers[i, :] = np.sum(
+            self.centers_[i, :] = np.sum(
                 feature_matrix * membership_coefficients[:, i].reshape(-1, 1),
                 axis=0,
                 keepdims=True,
@@ -219,7 +235,7 @@ class FuzzCMeans:
         """
         for idx, datapoint in enumerate(feature_matrix):
             # Get distance to clusters
-            distance_to_centers = self.distance_criterion(self.centers, datapoint)
+            distance_to_centers = self.distance_criterion(self.centers_, datapoint)
             # Elevate to fuzzines parameter power
             sum_centers_inverse_distance = np.sum(
                 np.power(1 / distance_to_centers, 2 / (self.fuzzines_parameter - 1))
@@ -229,7 +245,7 @@ class FuzzCMeans:
                 distance_to_centers, 2 / (self.fuzzines_parameter - 1)
             )
             # Update membership matrix
-            self.assignments[idx, :] = (
+            self.assignments_[idx, :] = (
                 1 / (elevated_centers_distance * sum_centers_inverse_distance)
             ).squeeze()
 
@@ -243,10 +259,10 @@ class FuzzCMeans:
         cost = 0
         for cluster in range(self.number_of_clusters):
             powered_membership_coefficients = np.power(
-                self.assignments[:, cluster].reshape(-1, 1), self.fuzzines_parameter
+                self.assignments_[:, cluster].reshape(-1, 1), self.fuzzines_parameter
             ).T
             distance_to_centers = self.distance_criterion(
-                feature_matrix, self.centers[cluster, :]
+                feature_matrix, self.centers_[cluster, :]
             )
             cost += np.dot(
                 powered_membership_coefficients,
@@ -255,10 +271,12 @@ class FuzzCMeans:
         if self.verbose:
             print(f"Cost: {cost}")
 
-    def fit(self, feature_matrix: np.ndarray) -> None:
+    def fit(self, feature_matrix: np.ndarray, target: np.ndarray = None) -> None:
         """Fits the FuzzCMeans algorithm.
         Args:
             feature_matrix (np.ndarray): Feature matrix.
+            target (np.ndarray): Target. Defaults to None. This parameter is not used and is only
+                added for it to be compliant with the sklearn API.
         """
         # Initialize parameters
         self._initialize_variables(feature_matrix)
@@ -270,31 +288,35 @@ class FuzzCMeans:
             self._update_membership_matrix(feature_matrix)
             # Compute cost
             self._compute_cost(feature_matrix)
+        return self
 
-    def transform(self) -> np.ndarray:
+    def predict(self) -> np.ndarray:
         """Returns the assignments matrix.
         Returns:
             np.ndarray: Assignments matrix.
         """
-        return self.assignments
+        return self.assignments_
 
 
-class MountainClustering:
+class MountainClustering(BaseEstimator, ClusterMixin):
 
     """Mountain clustering algorithm."""
 
     def __init__(
         self,
-        number_of_clusters: int,
-        number_of_partitions: int,
-        distance_metric: str,
-        sigma_squared: float,
-        beta_squared: float,
+        number_of_clusters: int = 5,
+        number_of_partitions: int = 10,
+        distance_metric: str = "euclidean",
+        sigma_squared: float = 1,
+        beta_squared: float = 1.5,
     ) -> None:
         """Initializes the MountainClustering class.
         Args:
-            number_of_clusters (int): Number of clusters.
-            number_of_partitions (int): Number of partitions.
+            number_of_clusters (int): Number of clusters. Defaults to 5.
+            number_of_partitions (int): Number of partitions. Defaults to 10.
+            distance_metric (str): Distance metric. Defaults to 'euclidean'.
+            sigma_squared (float): Sigma squared. Defaults to 1.
+            beta_squared (float): Beta squared. Defaults to 1.5.
         """
         self.number_of_clusters = number_of_clusters
         self.number_of_partitions = number_of_partitions
@@ -302,9 +324,10 @@ class MountainClustering:
         self.beta_squared = beta_squared
         self.distance_criterion = DistanceMetric(distance_metric).get_distance
 
-        self.cluster_centers = None
-        self.cluster_mountain_functions = None
-        self.assignments = None
+        self.n_features_in_ = None
+        self.cluster_centers_ = None
+        self.cluster_mountain_functions_ = None
+        self.assignments_ = None
 
     def _create_grid(self, feature_matrix: np.ndarray) -> np.ndarray:
         """Creates a grid of points.
@@ -358,7 +381,7 @@ class MountainClustering:
         scaling_factor = (
             np.exp(
                 -np.power(
-                    self.distance_criterion(prototype, self.cluster_centers[-1]),
+                    self.distance_criterion(prototype, self.cluster_centers_[-1]),
                     2,
                 )
                 / (2 * self.beta_squared)
@@ -368,7 +391,7 @@ class MountainClustering:
         )
         return (
             mountain_function
-            - self.cluster_mountain_functions[-1].item() * scaling_factor
+            - self.cluster_mountain_functions_[-1].item() * scaling_factor
         )
 
     def _update_centers(
@@ -380,17 +403,17 @@ class MountainClustering:
             prototypes (np.ndarray): Prototypes.
         """
         maximum_index = np.argmax(mountain_functions)
-        if self.cluster_centers is None:
-            self.cluster_centers = np.array(prototypes[maximum_index, :])
-            self.cluster_mountain_functions = np.array(
+        if self.cluster_centers_ is None:
+            self.cluster_centers_ = np.array(prototypes[maximum_index, :])
+            self.cluster_mountain_functions_ = np.array(
                 mountain_functions[maximum_index]
             ).reshape(1, -1)
         else:
-            self.cluster_centers = np.vstack(
-                [self.cluster_centers, prototypes[maximum_index, :]]
+            self.cluster_centers_ = np.vstack(
+                [self.cluster_centers_, prototypes[maximum_index, :]]
             )
-            self.cluster_mountain_functions = np.append(
-                self.cluster_mountain_functions, mountain_functions[maximum_index]
+            self.cluster_mountain_functions_ = np.append(
+                self.cluster_mountain_functions_, mountain_functions[maximum_index]
             )
 
     def _assign_datapoints(self, feature_matrix: np.ndarray) -> None:
@@ -398,20 +421,24 @@ class MountainClustering:
         Args:
             feature_matrix (np.ndarray): Feature matrix.
         """
-        self.assignments = np.zeros((feature_matrix.shape[0], 1))
+        self.assignments_ = np.zeros((feature_matrix.shape[0], 1))
         for idx, datapoint in enumerate(feature_matrix):
             # Get distance to clusters
             centroids_distance = self.distance_criterion(
-                self.cluster_centers, datapoint
+                self.cluster_centers_, datapoint
             )
             # Update membership matrix
-            self.assignments[idx, 0] = np.argmin(centroids_distance)
+            self.assignments_[idx, 0] = np.argmin(centroids_distance)
 
-    def fit(self, feature_matrix: np.ndarray) -> None:
+    def fit(self, feature_matrix: np.ndarray, target: np.ndarray = None) -> None:
         """Fits the algithm to the data.
         Args:
             feature_matrix (np.ndarray): Feature matrix.
+            target (np.ndarray): Target. Defaults to None. This parameter is not used and is only
+                added for it to be compliant with the sklearn API.
         """
+        # Indicate the number of features the algorithm should expect in further calls
+        self.n_features_in_ = feature_matrix.shape[1]
         # Create prototype grid
         prototypes = self._create_grid(feature_matrix)
         # Evaluate prototypes mountain functions
@@ -431,21 +458,26 @@ class MountainClustering:
             self._update_centers(mountain_functions, prototypes)
         # Assign datapoints to clusters
         self._assign_datapoints(feature_matrix)
+        return self
 
-    def transform(self) -> np.ndarray:
+    def predict(self) -> np.ndarray:
         """Returns the assignments matrix.
         Returns:
             np.ndarray: Assignments matrix.
         """
-        return self.assignments
+        return self.assignments_
 
 
-class SubstractiveClustering:
+class SubstractiveClustering(BaseEstimator, ClusterMixin):
 
     """Substractive clustering algorithm."""
 
     def __init__(
-        self, number_of_clusters: int, r_a: float, r_b: float, distance_metric: str
+        self,
+        number_of_clusters: int = 5,
+        r_a: float = 1.0,
+        r_b: float = 1.5,
+        distance_metric: str = "euclidean",
     ) -> None:
         """Initializes the SubstractiveClustering class.
         Args:
@@ -456,9 +488,10 @@ class SubstractiveClustering:
         self.r_b = r_b
         self.distance_criterion = DistanceMetric(distance_metric).get_distance
 
-        self.cluster_centers = None
-        self.centers_densities = None
-        self.assignments = None
+        self.n_features_in_ = None
+        self.cluster_centers_ = None
+        self.centers_densities_ = None
+        self.assignments_ = None
 
     def _get_density(self, prototype: np.ndarray, feature_matrix: np.ndarray) -> float:
         """Returns the density of a datapoint.
@@ -483,15 +516,15 @@ class SubstractiveClustering:
             densities (np.ndarray): Densities.
         """
         maximum_index = np.argmax(densities)
-        if self.cluster_centers is None:
-            self.cluster_centers = np.array(feature_matrix[maximum_index, :])
-            self.centers_densities = np.array(densities[maximum_index]).reshape(1, -1)
+        if self.cluster_centers_ is None:
+            self.cluster_centers_ = np.array(feature_matrix[maximum_index, :])
+            self.centers_densities_ = np.array(densities[maximum_index]).reshape(1, -1)
         else:
-            self.cluster_centers = np.vstack(
-                [self.cluster_centers, feature_matrix[maximum_index, :]]
+            self.cluster_centers_ = np.vstack(
+                [self.cluster_centers_, feature_matrix[maximum_index, :]]
             )
-            self.centers_densities = np.append(
-                self.centers_densities, [densities[maximum_index]]
+            self.centers_densities_ = np.append(
+                self.centers_densities_, [densities[maximum_index]]
             )
 
     def _update_densities(self, prototype: np.ndarray, density: np.ndarray) -> None:
@@ -505,34 +538,38 @@ class SubstractiveClustering:
         scaling_factor = (
             np.exp(
                 -np.power(
-                    self.distance_criterion(prototype, self.cluster_centers[-1]), 2
+                    self.distance_criterion(prototype, self.cluster_centers_[-1]), 2
                 )
                 / ((self.r_b**2) / 4)
             )
             .squeeze()
             .item()
         )
-        return density - self.centers_densities[-1].item() * scaling_factor
+        return density - self.centers_densities_[-1].item() * scaling_factor
 
     def _assign_datapoints(self, feature_matrix: np.ndarray) -> None:
         """Assigns datapoints to clusters.
         Args:
             feature_matrix (np.ndarray): Feature matrix.
         """
-        self.assignments = np.zeros((feature_matrix.shape[0], 1))
+        self.assignments_ = np.zeros((feature_matrix.shape[0], 1))
         for idx, datapoint in enumerate(feature_matrix):
             # Get distance to clusters
             centroids_distance = self.distance_criterion(
-                self.cluster_centers, datapoint
+                self.cluster_centers_, datapoint
             )
             # Update membership matrix
-            self.assignments[idx, 0] = np.argmin(centroids_distance)
+            self.assignments_[idx, 0] = np.argmin(centroids_distance)
 
-    def fit(self, feature_matrix: np.ndarray) -> None:
+    def fit(self, feature_matrix: np.ndarray, target: np.ndarray = None) -> None:
         """Fits the algorithm to the data.
         Args:
             feature_matrix (np.ndarray): Feature matrix.
+            target (np.ndarray): Target. Defaults to None. This parameter is not used and is only
+                added for it to be compliant with the sklearn API.
         """
+        # Indicate the number of features the algorithm should expect in further calls
+        self.n_features_in_ = feature_matrix.shape[1]
         # Get density of datapoints
         densities = [
             self._get_density(datapoint, feature_matrix) for datapoint in feature_matrix
@@ -550,10 +587,11 @@ class SubstractiveClustering:
             self._update_centers(feature_matrix, densities)
         # Assign datapoints to clusters
         self._assign_datapoints(feature_matrix)
+        return self
 
-    def transform(self) -> np.ndarray:
+    def predict(self) -> np.ndarray:
         """Returns the assignments matrix.
         Returns:
             np.ndarray: Assignments matrix.
         """
-        return self.assignments
+        return self.assignments_

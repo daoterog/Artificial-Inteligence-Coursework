@@ -22,7 +22,7 @@ if __name__ == "__main__":
     fuzzycmeans = FuzzCMeans(number_of_clusters=5,
                         fuzzines_parameter=2,
                         distance_metric='euclidean',
-                        max_iters=1000,
+                        n_iter=1000,
                         verbose=False,)
 
     fuzzycmeans.fit(feature_matrix)

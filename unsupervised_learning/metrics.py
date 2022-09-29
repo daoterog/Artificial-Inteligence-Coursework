@@ -13,9 +13,8 @@ def cosine_distance(feature_matrix: np.ndarray, datapoint: np.ndarray) -> np.nda
     Returns:
         np.ndarray: Cosine distance between the feature_matrix and datapoint.
     """
-    return 1 - np.dot(feature_matrix, datapoint.reshape(-1, 1)) / (
-        np.linalg.norm(feature_matrix, axis=1).reshape(-1, 1)
-        * np.linalg.norm(datapoint)
+    return 1 - np.dot(feature_matrix, datapoint.T) / (
+        np.linalg.norm(feature_matrix, axis=1).reshape(-1, 1) * np.linalg.norm(datapoint)
     )
 
 

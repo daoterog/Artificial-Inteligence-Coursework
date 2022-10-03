@@ -4,7 +4,7 @@ Clustering experimentation module.
 
 from sklearn.datasets import load_iris
 
-from clustering import KMeans, FuzzCMeans, MountainClustering, SubstractiveClustering, ExpectationMaximization
+from clustering import KMeans, FuzzCMeans, MountainClustering, SubstractiveClustering, GaussianMixture
 
 def load_dataset():
     """Loads the iris dataset.
@@ -18,11 +18,13 @@ def load_dataset():
 if __name__ == "__main__":
     # Load the dataset
     feature_matrix, target_vector = load_dataset()
+    # Scale Feature Matrix
+    feature_min = feature_matrix.min(axis=0)
+    feature_max = feature_matrix.max(axis=0)
+    feature_matrix = (feature_matrix - feature_min) / (feature_max - feature_min)
     # Fit Algorithms
-    fuzzycmeans = FuzzCMeans(number_of_clusters=5,
-                        fuzzines_parameter=2,
-                        distance_metric='cosine',
-                        n_iter=2000,
-                        verbose=False,)
-
-    fuzzycmeans.fit(feature_matrix)
+    mountain_clustering = MountainClustering(number_of_partitions=10,
+                                        distance_metric='manhattan',
+                                        sigma_squared=1,
+                                        beta_squared=1.5,)
+    mountain_clustering.fit(feature_matrix)
